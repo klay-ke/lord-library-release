@@ -1,9 +1,10 @@
 {
-  "versionCode": 2,
-  "versionName": "0.2.0",
+  "versionCode": 3,
+  "versionName": "0.2.1",
   "title": "发现新版本",
   "notes": "",
-  "apkUrl": "https://pub-60f079aabd834aaaab067a13b0b82c48.r2.dev/release-0.2.0.apk",
-  "releaseUrl": "https://github.com/klay-ke/lord-library-release/releases/tag/v0.2.0",
+  "apkUrl": "https://pub-60f079aabd834aaaab067a13b0b82c48.r2.dev/release-0.2.1.apk",
+  "apkSizeBytes": 367279378,
+  "releaseUrl": "",
   "required": false
 }
