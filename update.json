@@ -2,8 +2,8 @@
   "versionCode": 2,
   "versionName": "0.2.0",
   "title": "发现新版本",
-  "notes": "新增自动版本检测，并优化阅读体验。",
-  "apkUrl": "https://github.com/klay-ke/lord-library-release/releases/download/v0.2.0/LordsLibrary-0.2.0.apk",
+  "notes": "",
+  "apkUrl": "https://pub-60f079aabd834aaaab067a13b0b82c48.r2.dev/release-0.2.0.apk",
   "releaseUrl": "https://github.com/klay-ke/lord-library-release/releases/tag/v0.2.0",
   "required": false
 }
