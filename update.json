@@ -1,10 +1,10 @@
 {
-  "versionCode": 6,
-  "versionName": "0.2.4",
+  "versionCode": 7,
+  "versionName": "0.2.5",
   "title": "发现新版本",
-  "notes": "",
-  "apkUrl": "https://pub-60f079aabd834aaaab067a13b0b82c48.r2.dev/release-0.2.4.apk",
-  "apkSizeBytes": 367279510,
+  "notes": "优化阅读与双语内容显示\n修复注解和版式问题",
+  "apkUrl": "https://pub-60f079aabd834aaaab067a13b0b82c48.r2.dev/release-0.2.5.apk",
+  "apkSizeBytes": 409353878,
   "releaseUrl": "",
   "required": false
 }
