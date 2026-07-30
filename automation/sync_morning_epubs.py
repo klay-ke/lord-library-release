@@ -454,6 +454,14 @@ def sync(*, dry_run: bool) -> int:
             f"Notion 最新卷：{event.code} {event.label}；"
             f"catalog 已是原生版 ({existing.get('source', 'unknown')})"
         )
+        if not dry_run:
+            client = r2_client()
+            client.list_objects_v2(
+                Bucket=os.environ["R2_BUCKET"],
+                Prefix=f"{R2_PREFIX}/",
+                MaxKeys=1,
+            )
+            log("R2 凭据和 bucket 读取权限验证成功")
         return 0
     if dry_run:
         action = "新增" if needs_new else "检查并升级原生版"
