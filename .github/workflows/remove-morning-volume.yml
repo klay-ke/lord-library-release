@@ -1,0 +1,35 @@
+name: Remove one morning revival volume
+
+on:
+  workflow_dispatch:
+    inputs:
+      code:
+        description: Exact catalog code to remove
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  remove:
+    runs-on: macos-15
+    timeout-minutes: 10
+    env:
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      R2_PUBLIC_BASE: ${{ vars.R2_PUBLIC_BASE }}
+      MORNING_CATALOG_URL: ${{ vars.MORNING_CATALOG_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: automation/requirements.txt
+      - name: Install dependencies
+        run: python -m pip install -r automation/requirements.txt
+      - name: Remove exact volume
+        run: python automation/remove_morning_volume.py --code '${{ inputs.code }}'
