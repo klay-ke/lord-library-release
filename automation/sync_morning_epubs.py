@@ -340,6 +340,29 @@ def validate_epub(payload: bytes) -> dict:
         return {"pageCount": len(pages), "readablePageCount": readable}
 
 
+def epub_topic(payload: bytes) -> str:
+    """Extract the Chinese volume topic from a native EPUB's catalog/title content."""
+    with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+        names = archive.namelist()
+        pages = sorted(
+            (
+                name for name in names
+                if name.lower().endswith((".html", ".htm", ".xhtml"))
+            ),
+            key=lambda name: (
+                0 if name.lower().endswith(("/index.html", "/index.htm")) else 1,
+                name,
+            ),
+        )
+        for name in pages:
+            source = archive.read(name).decode("utf-8", errors="ignore")
+            plain = html.unescape(re.sub(r"<[^>]+>", "\n", source))
+            match = re.search(r"总题\s*[：:]\s*([^\r\n]+)", plain)
+            if match:
+                return re.sub(r"\s+", " ", match.group(1)).strip()
+    return ""
+
+
 def sha256_bytes(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
 
@@ -497,6 +520,9 @@ def sync(*, dry_run: bool) -> int:
             payload, origin = result
 
         stats = validate_epub(payload)
+        if result is not None:
+            topic = epub_topic(payload) or topic
+            title = f"{event.year}年{event.label}" + (f" {topic}" if topic else "")
         digest = sha256_bytes(payload)
         file_name = (
             existing.get("fileName")
