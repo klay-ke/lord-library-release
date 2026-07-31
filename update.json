@@ -1,10 +1,10 @@
 {
-  "versionCode": 8,
-  "versionName": "0.2.6",
+  "versionCode": 9,
+  "versionName": "0.2.7",
   "title": "发现新版本",
-  "notes": "优化圣经注解弹出性能\n修复诗歌列表、附录段号与附录简谱",
-  "apkUrl": "https://pub-60f079aabd834aaaab067a13b0b82c48.r2.dev/release-0.2.6.apk",
-  "apkSizeBytes": 416589176,
+  "notes": "修复阅读器字号在100%以上不生效\n修复字体粗细调节无变化",
+  "apkUrl": "https://pub-60f079aabd834aaaab067a13b0b82c48.r2.dev/release-0.2.7.apk",
+  "apkSizeBytes": 416589180,
   "releaseUrl": "",
   "required": false
 }
