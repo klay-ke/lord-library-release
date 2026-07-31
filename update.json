@@ -2,7 +2,7 @@
   "versionCode": 9,
   "versionName": "0.2.7",
   "title": "发现新版本",
-  "notes": "修复阅读器字号在100%以上不生效\n修复字体粗细调节无变化",
+  "notes": "晨兴数据源升级为R2云端书库，支持按年份加载与增量更新\n优化晨兴下载、保存和阅读体验\n修复阅读器字号与字体粗细调节",
   "apkUrl": "https://pub-60f079aabd834aaaab067a13b0b82c48.r2.dev/release-0.2.7.apk",
   "apkSizeBytes": 416589180,
   "releaseUrl": "",
