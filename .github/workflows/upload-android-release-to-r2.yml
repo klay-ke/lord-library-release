@@ -1,0 +1,94 @@
+name: Upload Android release to R2
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version without the v prefix
+        required: true
+        type: string
+      sha256:
+        description: Expected APK SHA-256
+        required: true
+        type: string
+      size:
+        description: Expected APK size in bytes
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      R2_PUBLIC_BASE: ${{ vars.R2_PUBLIC_BASE }}
+      VERSION: ${{ inputs.version }}
+      EXPECTED_SHA256: ${{ inputs.sha256 }}
+      EXPECTED_SIZE: ${{ inputs.size }}
+    steps:
+      - name: Download signed GitHub release APK
+        run: |
+          curl --fail --location --retry 4 \
+            "https://github.com/klay-ke/lord-library-release/releases/download/v${VERSION}/LordsLibrary-${VERSION}.apk" \
+            --output app.apk
+          test "$(stat --format=%s app.apk)" = "${EXPECTED_SIZE}"
+          echo "${EXPECTED_SHA256}  app.apk" | sha256sum --check -
+
+      - name: Upload to R2 with multipart S3 transfer
+        run: |
+          python -m pip install --quiet boto3
+          python - <<'PY'
+          import os
+          import boto3
+          from boto3.s3.transfer import TransferConfig
+
+          client = boto3.client(
+              "s3",
+              endpoint_url=f"https://{os.environ['R2_ACCOUNT_ID']}.r2.cloudflarestorage.com",
+              aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"],
+              aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"],
+              region_name="auto",
+          )
+          key = f"release-{os.environ['VERSION']}.apk"
+          client.upload_file(
+              "app.apk",
+              os.environ["R2_BUCKET"],
+              key,
+              ExtraArgs={
+                  "ContentType": "application/vnd.android.package-archive",
+                  "CacheControl": "public, max-age=31536000, immutable",
+                  "Metadata": {"sha256": os.environ["EXPECTED_SHA256"]},
+              },
+              Config=TransferConfig(
+                  multipart_threshold=64 * 1024 * 1024,
+                  multipart_chunksize=64 * 1024 * 1024,
+                  max_concurrency=4,
+              ),
+          )
+          head = client.head_object(Bucket=os.environ["R2_BUCKET"], Key=key)
+          if head["ContentLength"] != int(os.environ["EXPECTED_SIZE"]):
+              raise SystemExit("R2 object size mismatch")
+          print(f"Uploaded {key}: {head['ContentLength']} bytes")
+          PY
+
+      - name: Verify public download
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            actual="$(curl --silent --show-error --location --range 0-0 \
+              --output /dev/null --write-out '%{http_code} %{size_download}' \
+              "${R2_PUBLIC_BASE}/release-${VERSION}.apk")"
+            if [[ "$actual" == "206 1" || "$actual" == "200 ${EXPECTED_SIZE}" ]]; then
+              echo "Public R2 download verified: $actual"
+              exit 0
+            fi
+            sleep $((attempt * 2))
+          done
+          echo "Public R2 verification failed" >&2
+          exit 1
