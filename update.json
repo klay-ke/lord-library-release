@@ -1,9 +1,9 @@
 {
-  "versionCode": 9,
-  "versionName": "0.2.7",
+  "versionCode": 10,
+  "versionName": "0.2.8",
   "title": "发现新版本",
-  "notes": "• 更新晨兴数据源",
-  "apkUrl": "https://pub-60f079aabd834aaaab067a13b0b82c48.r2.dev/release-0.2.7.apk",
+  "notes": "• 更新晨兴数据源\n• 优化已保存内容",
+  "apkUrl": "https://pub-60f079aabd834aaaab067a13b0b82c48.r2.dev/release-0.2.8.apk",
   "apkSizeBytes": 416589180,
   "releaseUrl": "",
   "required": false
