@@ -1,10 +1,10 @@
 {
-  "versionCode": 13,
-  "versionName": "0.2.11",
+  "versionCode": 14,
+  "versionName": "0.2.12",
   "title": "发现新版本",
-  "notes": "• 增加了儿童诗歌的音频和简谱",
-  "apkUrl": "https://pub-60f079aabd834aaaab067a13b0b82c48.r2.dev/release-0.2.11.apk",
-  "apkSizeBytes": 525520873,
+  "notes": "• 增加圣经经文搜索",
+  "apkUrl": "https://pub-60f079aabd834aaaab067a13b0b82c48.r2.dev/release-0.2.12.apk",
+  "apkSizeBytes": 525537257,
   "releaseUrl": "",
   "required": false
 }
