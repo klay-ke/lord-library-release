@@ -1,0 +1,37 @@
+name: PG&E monthly collection
+on:
+  schedule:
+    - cron: '0 0 15 * *'
+      timezone: America/Los_Angeles
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Read-only validation (does not collect)
+        type: boolean
+        default: true
+permissions:
+  contents: write
+concurrency:
+  group: pge-monthly-collection
+  cancel-in-progress: false
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      UTILITYAPI_TOKEN: ${{ secrets.UTILITYAPI_TOKEN }}
+      UTILITYAPI_METER_UID: ${{ secrets.UTILITYAPI_METER_UID }}
+      GH_TOKEN: ${{ github.token }}
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test collection guards
+        run: python -m unittest discover -s automation/utilityapi
+      - name: Collect once, or validate without collection
+        run: |
+          args=()
+          if [ "$DRY_RUN" = true ]; then args+=(--dry-run); fi
+          python automation/utilityapi/collect.py "${args[@]}"
