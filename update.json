@@ -1,10 +1,10 @@
 {
-  "versionCode": 14,
-  "versionName": "0.2.12",
+  "versionCode": 15,
+  "versionName": "0.2.13",
   "title": "发现新版本",
-  "notes": "• 增加圣经经文搜索",
-  "apkUrl": "https://pub-60f079aabd834aaaab067a13b0b82c48.r2.dev/release-0.2.12.apk",
-  "apkSizeBytes": 525537257,
+  "notes": "增加了乐谱，并且支持全屏看简谱/乐谱",
+  "apkUrl": "https://pub-60f079aabd834aaaab067a13b0b82c48.r2.dev/release-0.2.13.apk",
+  "apkSizeBytes": 554319651,
   "releaseUrl": "",
   "required": false
 }
