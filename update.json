@@ -1,9 +1,9 @@
 {
-  "versionCode": 16,
-  "versionName": "0.2.14",
+  "versionCode": 17,
+  "versionName": "0.2.15",
   "title": "发现新版本",
-  "notes": "增加初信晨兴材料，优化 EPUB 排版和章节切换。",
-  "apkUrl": "https://pub-60f079aabd834aaaab067a13b0b82c48.r2.dev/release-0.2.14.apk",
+  "notes": "优化圣经页内搜索，支持简繁体卷名、缩写、拼音定位及整章经文查询；优化搜索结果样式和诗歌使用体验。",
+  "apkUrl": "https://pub-60f079aabd834aaaab067a13b0b82c48.r2.dev/release-0.2.15.apk",
   "apkSizeBytes": 554900767,
   "releaseUrl": "",
   "required": false
