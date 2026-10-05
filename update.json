@@ -1,9 +1,9 @@
 {
-  "versionCode": 17,
-  "versionName": "0.2.15",
+  "versionCode": 18,
+  "versionName": "0.2.16",
   "title": "发现新版本",
-  "notes": "优化圣经页内搜索，支持简繁体卷名、缩写、拼音定位及整章经文查询；优化搜索结果样式和诗歌使用体验。",
-  "apkUrl": "https://pub-60f079aabd834aaaab067a13b0b82c48.r2.dev/release-0.2.15.apk",
+  "notes": "清理旧底部导航栏相关代码，优化列表底部留白；保留新版圣经页内搜索、卷名定位和整章搜索。",
+  "apkUrl": "https://pub-60f079aabd834aaaab067a13b0b82c48.r2.dev/release-0.2.16.apk",
   "apkSizeBytes": 554900767,
   "releaseUrl": "",
   "required": false
