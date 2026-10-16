@@ -27,6 +27,9 @@ def api(path, payload=None):
     with urllib.request.urlopen(req, timeout=45) as response:
         return json.load(response)
 
+def collection_date_allowed(now, event_name):
+    return event_name == 'workflow_dispatch' or now.day == 15
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dry-run', action='store_true')
@@ -46,8 +49,8 @@ def main():
     if args.dry_run:
         print('Read-only validation passed. No collection was triggered.')
         return
-    if now.day != 15:
-        raise RuntimeError('Collection is only allowed on the 15th in America/Los_Angeles')
+    if not collection_date_allowed(now, os.environ.get('GITHUB_EVENT_NAME')):
+        raise RuntimeError('Scheduled collection is only allowed on the 15th in America/Los_Angeles; use workflow_dispatch after a billing email')
     # Create an atomic marker BEFORE POST. A rerun after timeout must not collect again.
     repo = os.environ['GITHUB_REPOSITORY']
     ref = 'refs/tags/utilityapi-collection-' + month

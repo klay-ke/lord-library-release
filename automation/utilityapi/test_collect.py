@@ -1,8 +1,15 @@
 import unittest
 from datetime import datetime
-from collect import same_month, already_collected, ZONE
+from collect import same_month, already_collected, collection_date_allowed, ZONE
 
 class CollectionGuardTests(unittest.TestCase):
+    def test_manual_billing_trigger_can_run_before_or_after_15th(self):
+        for day in [1, 14, 16, 31]:
+            self.assertTrue(collection_date_allowed(datetime(2026, 10, day, tzinfo=ZONE), 'workflow_dispatch'))
+    def test_other_triggers_still_require_15th(self):
+        for event in ['schedule', 'push', None]:
+            self.assertFalse(collection_date_allowed(datetime(2026, 10, 14, tzinfo=ZONE), event))
+            self.assertTrue(collection_date_allowed(datetime(2026, 10, 15, tzinfo=ZONE), event))
     def test_los_angeles_month_boundary(self):
         now = datetime(2026, 10, 15, tzinfo=ZONE)
         self.assertFalse(same_month('2026-10-01T06:59:00Z', now))
