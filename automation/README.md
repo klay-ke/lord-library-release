@@ -8,13 +8,12 @@
 2. 如果 `catalog.json` 没有该卷，进入新增流程。
 3. 如果 catalog 已有该卷，但 `source` 是 `ios-html-export`、`stemofjesse-html`
    或 `generated-html`，重新检查是否出现了原生 EPUB；找到后覆盖 R2 原对象并更新 catalog。
-4. 如果 catalog 已经是 Notion/Stem 原生 EPUB，本周直接结束。
-5. 新增流程优先读取资源页中的 EPUB。
-6. 没有 EPUB 时读取 `epub&pdb` ZIP，并选择其中最大的 EPUB。
-7. Notion 没有资源时检查 Stem of Jesse 的 EPUB。
-8. 仍没有时调用 `automation/morning_epub/morning_epub.py` 从 HTML 生成。
-9. 校验 EPUB ZIP、OPF、正文和 SHA-256。
-10. 先上传 EPUB并从公网回读校验，最后更新 R2 `catalog.json`。
+4. 如果 catalog 已经是原生 EPUB，本周直接结束；历史来源标记继续兼容。
+5. 只从 Paul 的 Notion 读取资源页中的 EPUB。
+6. 没有 EPUB 时读取 Notion 中的 `epub&pdb` ZIP，并选择其中最大的 EPUB。
+7. Notion 暂无原生文件时正常结束，保留现有书库，下次运行继续检查。不会访问 Stem of Jesse，也不会从 HTML 生成 EPUB。
+8. 校验 EPUB ZIP、OPF、正文和 SHA-256。
+9. 先上传 EPUB 并从公网回读校验，最后更新 R2 `catalog.json`。
 
 ## GitHub 配置
 

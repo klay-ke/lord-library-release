@@ -11,16 +11,12 @@ import io
 import json
 import os
 import re
-import subprocess
-import sys
-import tempfile
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
 from dataclasses import dataclass
-from pathlib import Path
 
 
 NOTION_API = "https://www.notion.so/api/v3"
@@ -271,48 +267,6 @@ def epub_from_notion(event: Candidate, event_blocks: dict[str, Block]) -> tuple[
         return bundle.read(selected), "notion-zip"
 
 
-def stem_page_url(event: Candidate) -> str:
-    wiki_id = f"晨兴圣言:{event.year}:{event.code}.{event.label}"
-    return "https://stemofjesse.org/doku/doku.php/" + urllib.parse.quote(wiki_id, safe=":")
-
-
-def stem_direct_epub(source_url: str) -> bytes | None:
-    try:
-        page = request_bytes(source_url).decode("utf-8", errors="replace")
-    except urllib.error.HTTPError as error:
-        if error.code == 404:
-            return None
-        raise
-    if "This topic does not exist yet" in page or "该主题尚不存在" in page:
-        return None
-    links = re.findall(r"""href=["']([^"']+\.epub(?:\?[^"']*)?)["']""", page, re.I)
-    if not links:
-        material_url = source_url.rstrip("/") + ":" + urllib.parse.quote("材料下载")
-        material = request_bytes(material_url).decode("utf-8", errors="replace")
-        links = re.findall(r"""href=["']([^"']+\.epub(?:\?[^"']*)?)["']""", material, re.I)
-    if not links:
-        return None
-    return request_bytes(urllib.parse.urljoin(source_url, html.unescape(links[0])), timeout=240)
-
-
-def generate_from_stem(event: Candidate, title: str, source_url: str, output: Path) -> bytes:
-    generator = Path(__file__).resolve().parent / "morning_epub" / "morning_epub.py"
-    destination = output / "generated"
-    command = [
-        sys.executable, str(generator),
-        "--source-url", source_url,
-        "--year", str(event.year),
-        "--id", f"晨兴圣言:{event.year}:{event.code}.{event.label}",
-        "--title", title,
-        "--output", str(destination),
-    ]
-    subprocess.run(command, check=True)
-    generated = list((destination / "epub" / str(event.year)).glob("*.epub"))
-    if len(generated) != 1:
-        raise RuntimeError(f"HTML 转换结果不是一本 EPUB：{generated}")
-    return generated[0].read_bytes()
-
-
 def validate_epub(payload: bytes) -> dict:
     if len(payload) < 1024:
         raise RuntimeError("EPUB 文件过小")
@@ -491,93 +445,77 @@ def sync(*, dry_run: bool) -> int:
         log(f"[待处理:{action}] {event.code} {event.label}")
         return 0
 
+    log(f"[{event.code}] 检查 Notion")
+    event_blocks = load_notion_page(event.event_id)
+    topic = page_topic(event_blocks)
+    title = f"{event.year}年{event.label}" + (f" {topic}" if topic else "")
+    result = epub_from_notion(event, event_blocks)
+    source_url = f"https://www.notion.so/{event.event_id.replace('-', '')}"
+    if result is None:
+        log(f"[{event.code}] Notion 尚无原生 EPUB，保留现有书库，等待下次检查")
+        return 0
+    payload, origin = result
     client = r2_client()
     bucket = os.environ["R2_BUCKET"]
-    with tempfile.TemporaryDirectory(prefix="morning-sync-") as temporary:
-        temp = Path(temporary)
-        log(f"[{event.code}] 检查 Notion")
-        event_blocks = load_notion_page(event.event_id)
-        topic = page_topic(event_blocks)
-        title = f"{event.year}年{event.label}" + (f" {topic}" if topic else "")
-        result = epub_from_notion(event, event_blocks)
-        source_url = f"https://www.notion.so/{event.event_id.replace('-', '')}"
-        if result is None:
-            source_url = stem_page_url(event)
-            log(f"[{event.code}] Notion 无原生 EPUB，检查 Stem of Jesse")
-            direct = stem_direct_epub(source_url)
-            if direct is not None:
-                result = (direct, "stemofjesse-epub")
 
-        # 已有生成版时只在找到原生文件后覆盖；没有原生文件便保留现状。
-        if result is None and needs_native_upgrade:
-            log(f"[{event.code}] 尚无原生 EPUB，保留当前生成版")
-            return 0
-        if result is None:
-            log(f"[{event.code}] 两处均无原生 EPUB，从 HTML 生成")
-            payload = generate_from_stem(event, title, source_url, temp)
-            origin = "stemofjesse-html"
-        else:
-            payload, origin = result
+    stats = validate_epub(payload)
+    topic = epub_topic(payload) or topic
+    title = f"{event.year}年{event.label}" + (f" {topic}" if topic else "")
+    digest = sha256_bytes(payload)
+    file_name = (
+        existing.get("fileName")
+        if existing and existing.get("fileName")
+        else f"{event.code}.{event.label}.epub"
+    )
+    object_path = (
+        existing.get("path")
+        if existing and existing.get("path")
+        else f"{R2_PREFIX}/{event.year}/{file_name}"
+    )
+    log(f"[{event.code}] 上传 {len(payload):,} bytes ({origin})")
+    client.put_object(
+        Bucket=bucket,
+        Key=object_path,
+        Body=payload,
+        ContentType="application/epub+zip",
+        CacheControl="public, max-age=31536000, immutable",
+        Metadata={"sha256": digest, "source": origin},
+    )
+    verify_public_object(object_path, payload)
+    add_catalog_book(catalog, {
+        **(existing or {}),
+        "id": event.code,
+        "code": event.code,
+        "year": event.year,
+        "sequence": event.sequence,
+        "title": title,
+        "fileName": file_name,
+        "path": object_path,
+        "downloadURL": encoded_public_url(object_path, digest),
+        "mediaType": "application/epub+zip",
+        "sizeBytes": len(payload),
+        "sha256": digest,
+        "source": origin,
+        "sourceURL": source_url,
+        **stats,
+    })
 
-        stats = validate_epub(payload)
-        if result is not None:
-            topic = epub_topic(payload) or topic
-            title = f"{event.year}年{event.label}" + (f" {topic}" if topic else "")
-        digest = sha256_bytes(payload)
-        file_name = (
-            existing.get("fileName")
-            if existing and existing.get("fileName")
-            else f"{event.code}.{event.label}.epub"
-        )
-        object_path = (
-            existing.get("path")
-            if existing and existing.get("path")
-            else f"{R2_PREFIX}/{event.year}/{file_name}"
-        )
-        log(f"[{event.code}] 上传 {len(payload):,} bytes ({origin})")
-        client.put_object(
-            Bucket=bucket,
-            Key=object_path,
-            Body=payload,
-            ContentType="application/epub+zip",
-            CacheControl="public, max-age=31536000, immutable",
-            Metadata={"sha256": digest, "source": origin},
-        )
-        verify_public_object(object_path, payload)
-        add_catalog_book(catalog, {
-            **(existing or {}),
-            "id": event.code,
-            "code": event.code,
-            "year": event.year,
-            "sequence": event.sequence,
-            "title": title,
-            "fileName": file_name,
-            "path": object_path,
-            "downloadURL": encoded_public_url(object_path, digest),
-            "mediaType": "application/epub+zip",
-            "sizeBytes": len(payload),
-            "sha256": digest,
-            "source": origin,
-            "sourceURL": source_url,
-            **stats,
-        })
-
-        catalog_bytes = finalize_catalog(catalog)
-        stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        history_path = f"{R2_PREFIX}/catalog-history/catalog-{stamp}.json"
-        client.put_object(
-            Bucket=bucket, Key=history_path, Body=catalog_bytes,
-            ContentType="application/json; charset=utf-8",
-            CacheControl="public, max-age=31536000, immutable",
-        )
-        client.put_object(
-            Bucket=bucket, Key=f"{R2_PREFIX}/catalog.json", Body=catalog_bytes,
-            ContentType="application/json; charset=utf-8",
-            CacheControl="public, max-age=60, must-revalidate",
-        )
-        verify_public_object(f"{R2_PREFIX}/catalog.json", catalog_bytes)
-        action = "新增" if needs_new else "原生版升级"
-        log(f"发布完成：{action} {event.code}，catalog hash={catalog['contentHash']}")
+    catalog_bytes = finalize_catalog(catalog)
+    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    history_path = f"{R2_PREFIX}/catalog-history/catalog-{stamp}.json"
+    client.put_object(
+        Bucket=bucket, Key=history_path, Body=catalog_bytes,
+        ContentType="application/json; charset=utf-8",
+        CacheControl="public, max-age=31536000, immutable",
+    )
+    client.put_object(
+        Bucket=bucket, Key=f"{R2_PREFIX}/catalog.json", Body=catalog_bytes,
+        ContentType="application/json; charset=utf-8",
+        CacheControl="public, max-age=60, must-revalidate",
+    )
+    verify_public_object(f"{R2_PREFIX}/catalog.json", catalog_bytes)
+    action = "新增" if needs_new else "原生版升级"
+    log(f"发布完成：{action} {event.code}，catalog hash={catalog['contentHash']}")
     return 1
 
 
