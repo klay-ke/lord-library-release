@@ -11,6 +11,28 @@ def block(id, type="page", title="", parent="", content=(), **kwargs):
 
 
 class ResourceDiscoveryTests(unittest.TestCase):
+    def test_canonical_event_names(self):
+        self.assertEqual(sync.canonical_event_title("2026年秋季长老训练 亚伯拉罕、以撒、雅各的神"),
+                         "2026年秋季长老负责弟兄训练 亚伯拉罕、以撒、雅各的神")
+        self.assertEqual(sync.canonical_event_title("2026年春季长老及负责弟兄训练 主题"),
+                         "2026年春季长老负责弟兄训练 主题")
+        self.assertEqual(sync.canonical_event_title("2026年夏季训练 信徒（一）"),
+                         "2026年夏季训练 信徒（一）")
+
+    def test_native_title_repair_does_not_download_or_replace_epub(self):
+        book = {"title": "2026年秋季长老训练 主题", "source": "notion-epub"}
+        with patch.object(sync, "load_catalog", return_value={}), \
+             patch.object(sync, "discover_latest_candidate", return_value=self.event), \
+             patch.object(sync, "catalog_book", return_value=book), \
+             patch.object(sync, "r2_client"), \
+             patch.object(sync, "publish_catalog") as publish, \
+             patch.object(sync, "epub_from_notion") as download, \
+             patch.dict(sync.os.environ, {"R2_BUCKET": "test"}):
+            self.assertEqual(sync.sync(dry_run=False), 1)
+            publish.assert_called_once()
+            download.assert_not_called()
+            self.assertEqual(book["title"], "2026年秋季长老负责弟兄训练 主题")
+
     def setUp(self):
         self.event = sync.Candidate("2026.05", 2026, 5, "event", "event", "event")
         self.blocks = {

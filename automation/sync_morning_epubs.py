@@ -456,6 +456,29 @@ def verify_public_object(path: str, expected: bytes) -> None:
     raise RuntimeError(f"R2 公网校验失败：{url}")
 
 
+def canonical_event_title(title: str) -> str:
+    for season in ("春季", "秋季"):
+        for alias in (f"{season}长老及负责弟兄训练", f"{season}长老训练"):
+            title = title.replace(alias, f"{season}长老负责弟兄训练")
+    return title
+
+
+def publish_catalog(client, bucket: str, catalog: dict) -> None:
+    catalog_bytes = finalize_catalog(catalog)
+    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    client.put_object(
+        Bucket=bucket, Key=f"{R2_PREFIX}/catalog-history/catalog-{stamp}.json",
+        Body=catalog_bytes, ContentType="application/json; charset=utf-8",
+        CacheControl="public, max-age=31536000, immutable",
+    )
+    client.put_object(
+        Bucket=bucket, Key=f"{R2_PREFIX}/catalog.json", Body=catalog_bytes,
+        ContentType="application/json; charset=utf-8",
+        CacheControl="public, max-age=60, must-revalidate",
+    )
+    verify_public_object(f"{R2_PREFIX}/catalog.json", catalog_bytes)
+
+
 def sync(*, dry_run: bool) -> int:
     catalog = load_catalog()
     event = discover_latest_candidate()
@@ -472,6 +495,14 @@ def sync(*, dry_run: bool) -> int:
             f"catalog 当前为生成版 ({existing.get('source')})，检查原生 EPUB"
         )
     else:
+        old_title = existing.get("title", "")
+        normalized_title = canonical_event_title(old_title)
+        if normalized_title != old_title:
+            log(f"[{event.code}] 规范特会名称：{normalized_title}")
+            if not dry_run:
+                existing["title"] = normalized_title
+                publish_catalog(r2_client(), os.environ["R2_BUCKET"], catalog)
+            return 1
         log(
             f"Notion 最新卷：{event.code} {event.label}；"
             f"catalog 已是原生版 ({existing.get('source', 'unknown')})"
@@ -493,7 +524,7 @@ def sync(*, dry_run: bool) -> int:
     log(f"[{event.code}] 检查 Notion")
     event_blocks = load_notion_page(event.event_id)
     topic = page_topic(event_blocks)
-    title = f"{event.year}年{event.label}" + (f" {topic}" if topic else "")
+    title = canonical_event_title(f"{event.year}年{event.label}") + (f" {topic}" if topic else "")
     result = epub_from_notion(event, event_blocks)
     source_url = f"https://www.notion.so/{event.event_id.replace('-', '')}"
     if result is None:
@@ -505,7 +536,7 @@ def sync(*, dry_run: bool) -> int:
 
     stats = validate_epub(payload)
     topic = epub_topic(payload) or topic
-    title = f"{event.year}年{event.label}" + (f" {topic}" if topic else "")
+    title = canonical_event_title(f"{event.year}年{event.label}") + (f" {topic}" if topic else "")
     digest = sha256_bytes(payload)
     file_name = (
         existing.get("fileName")
