@@ -39,6 +39,8 @@ jobs:
           cache-dependency-path: automation/requirements.txt
       - name: Install dependencies
         run: python -m pip install -r automation/requirements.txt
+      - name: Test resource discovery
+        run: python -m unittest discover -s automation -p 'test_sync_morning_epubs.py' -v
       - name: Discover and publish
         run: |
           args=()

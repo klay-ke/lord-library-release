@@ -47,6 +47,8 @@ class Block:
     source: str
     content: tuple[str, ...]
     parent_id: str
+    collection_id: str = ""
+    view_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -116,6 +118,13 @@ def load_notion_page(page_id: str) -> dict[str, Block]:
         "chunkNumber": 0,
         "verticalColumns": False,
     })
+    blocks = parse_blocks(data)
+    if page_id not in blocks:
+        raise RuntimeError(f"Notion 页面不可读取：{page_id}")
+    return blocks
+
+
+def parse_blocks(data: dict) -> dict[str, Block]:
     blocks: dict[str, Block] = {}
     for key, wrapper in data.get("recordMap", {}).get("block", {}).items():
         value = wrapper.get("value", {})
@@ -129,9 +138,9 @@ def load_notion_page(page_id: str) -> dict[str, Block]:
             source=rich_text(properties.get("source")),
             content=tuple(value.get("content", [])),
             parent_id=value.get("parent_id", ""),
+            collection_id=value.get("collection_id", ""),
+            view_ids=tuple(value.get("view_ids", [])),
         )
-    if page_id not in blocks:
-        raise RuntimeError(f"Notion 页面不可读取：{page_id}")
     return blocks
 
 
@@ -217,10 +226,46 @@ def page_topic(blocks: dict[str, Block]) -> str:
 def find_resource_page(event: Candidate, blocks: dict[str, Block]) -> Block | None:
     root = blocks[event.event_id]
     children = [blocks[child] for child in root.content if child in blocks]
-    return next(
+    direct = next(
         (block for block in children if block.type == "page" and "资源" in block.title),
         None,
     )
+    if direct:
+        return direct
+    for block in children:
+        if block.type not in {"collection_view", "collection_view_page"}:
+            continue
+        if not block.collection_id or not block.view_ids:
+            raise RuntimeError(f"Notion 数据库缺少查询信息：{block.id}")
+        # Query database rows, not page_sort (which may omit newly added pages).
+        for limit in (100, 1000, 10000):
+            data = notion_post("queryCollection", {
+                "collectionId": block.collection_id,
+                "collectionViewId": block.view_ids[0],
+                "loader": {
+                    "type": "reducer",
+                    "reducers": {"collection_group_results": {
+                        "type": "results", "limit": limit,
+                    }},
+                    "searchQuery": "",
+                    "userTimeZone": "America/Los_Angeles",
+                },
+            })
+            result = data.get("result", {}).get("reducerResults", {}).get("collection_group_results")
+            if not isinstance(result, dict) or "blockIds" not in result:
+                raise RuntimeError(f"Notion 数据库查询返回异常：{block.id}")
+            rows = parse_blocks(data)
+            for row_id in result["blockIds"]:
+                row = rows.get(row_id)
+                if row is None:
+                    row = load_notion_page(row_id)[row_id]
+                if row.type == "page" and row.parent_id == block.collection_id and "资源" in row.title:
+                    return row
+            if not result.get("hasMore", False):
+                break
+        else:
+            raise RuntimeError(f"Notion 数据库结果过多，未完成资源页检查：{block.id}")
+    return None
 
 
 def signed_notion_url(block: Block) -> str:
@@ -241,7 +286,7 @@ def signed_notion_url(block: Block) -> str:
 def epub_from_notion(event: Candidate, event_blocks: dict[str, Block]) -> tuple[bytes, str] | None:
     resource = find_resource_page(event, event_blocks)
     if resource is None:
-        return None
+        raise RuntimeError(f"{event.code} 未找到资源页，不能判定为没有 EPUB")
     blocks = load_notion_page(resource.id)
     files = [block for block in blocks.values() if block.type == "file" and block.source]
     direct = next((block for block in files if block.title.lower().endswith(".epub")), None)
